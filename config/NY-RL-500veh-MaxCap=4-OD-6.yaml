@@ -1,0 +1,59 @@
+SIMULATION:
+  START: 36000
+  END: 43200
+  STEP_TIME: 60
+
+REQUEST:
+  DATA:
+    TRAIN: './data/train'
+    VALIDATION:
+    TEST:
+  CHECK_ITINERARY: False
+  CONSTRAINTS:
+    max_assign_time: 600
+    max_pickup_time: 600
+    max_travel_time_mul: 1.5
+    max_travel_dis_mul: 1.5
+  BEHAVIORS:
+    max_assign_time: 180
+    max_pickup_time: 300
+    cancel_prob_assign: 0.6
+    cancel_prob_pickup: 0.1
+    max_tol_vehicle_capacity: 4
+    max_tol_price: None
+
+VEHICLE:
+  DATA: './data/driver_info.pickle'
+  NUM: 50
+  VELOCITY: 6
+  MAXCAPACITY: 4
+  PlanPathMethod: 'NearestFirst'
+  REPOSITION:
+    TYPE: False
+    METHOD: 'Random'
+    
+ENVIRONMENT:
+  TYPE: 'NY'
+  NY:
+    RoadFile: './data/graph.graphml'
+    TravelTimeFile: None
+    TravelDisFile: None
+    X_GRID_NUM: 20
+    Y_GRID_NUM: 20
+  TOY:
+    NumNode: 21
+    DisPerLine: 500
+  CONSIDER_ITINERARY: False
+  CONSIDER_CONGESTION: False
+
+MODEL:
+  EPISODES: 500
+  LOCATION_EMBED_NUM: 10
+  TIME_EMBED_NUM: 3
+  DISCOUNT_FACTOR: 0.99
+  LEARNING_RATE: 0.01
+  BATCH_SIZE: 64
+  MEMORY_SIZE: 20000
+  TRAIN_FREQUENCY: 100
+  TIME_INTERVAL: 900
+  REPOSITION: True
