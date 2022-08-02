@@ -61,8 +61,8 @@ class ActionSystem:
             # The current position of the vehicle and the path should be the same
             assert vehicle.current_position == path.current_position
             
-            # Update path
-            if self.consider_itinerary:
+            # Update path (including itinerary nodes)
+            if self.consider_itinerary and len(vehicles) > 1:
                 path = self.RTV_system.PlanPath.UpdateItineraryNodes(path)
             
             # Update requests
@@ -90,6 +90,12 @@ class ActionSystem:
             else:
                 vehicle.remaining_time_for_current_node = 0
                 vehicle.path = path
+            
+            # Chack if the vehicle is (will be) full
+            if vehicle.current_capacity + sum([req.num_person for req in vehicle.next_requests]) >= vehicle.max_capacity:
+                vehicle.open2request = False
+            else:
+                vehicle.open2request = True
                   
 
     # function: Simulate the action of each vehicle and manage all vehicles (to the next position, get offline, and etc.)
@@ -187,6 +193,12 @@ class ActionSystem:
                     assert len(vehicle.next_requests) == 0
                     # Update the vehicle
                     vehicle.Status2Idle() # Set the vehicle idle
+            
+            # Chack if the vehicle is (will be) full
+            if vehicle.current_capacity + sum([req.num_person for req in vehicle.next_requests]) >= vehicle.max_capacity:
+                vehicle.open2request = False
+            else:
+                vehicle.open2request = True
             
 
     # function: Remove the finished requests, and the unmatched requests are returned and will be merged with the new requests at next time step

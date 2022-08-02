@@ -1,5 +1,6 @@
 #####################################################
 ######         Written by Wang CHEN            ######
+######     E-mail: wchen22@connect.hku.hk      ######
 ######     Copyright @ Smart Mobility Lab      ######
 ######    Department of Civil Engineering      ######
 ######      Thu University of Hong Kong        ######

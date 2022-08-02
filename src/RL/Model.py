@@ -1,8 +1,5 @@
 from array import array
-import sys
-import gym
 import torch
-import pylab
 import random
 import numpy as np
 import torch.nn as nn
@@ -125,8 +122,8 @@ class Agent():
         self.batch_size = self.cfg.MODEL.BATCH_SIZE
         self.train_frequency = self.cfg.MODEL.TRAIN_FREQUENCY
         
-        #self.device = torch.device("cuda" if torch.cuda.is_available else "cpu")
-        self.device = 'cpu'
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = 'cpu'
 
         # create prioritized replay memory using SumTree
         self.memory = Memory(self.memory_size)

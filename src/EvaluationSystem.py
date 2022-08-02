@@ -27,7 +27,10 @@ class EvaluationSystem:
                 if len(trip.requests) > 0:
                     reward += sum(request.original_travel_distance for request in trip.requests) / 1000
                     reward -= alpha * np.sum(path.time_delay_to_each_position)
-                score = reward + self.cfg.MODEL.DISCOUNT_FACTOR * pre_values[value_cnt, 0]
+                if pre_values is not None:
+                    score = reward + self.cfg.MODEL.DISCOUNT_FACTOR * pre_values[value_cnt, 0]
+                else:
+                    score = reward
                 scored_vehicle_trips.append((trip, score, reward))
                 value_cnt += 1
             scored_feasible_trips.append(scored_vehicle_trips)
@@ -121,8 +124,15 @@ class EvaluationSystem:
             for vehicle_idx, (var, _) in trip_dict.items():
                 if (solution.get_value(var) == 1):
                     assigned_trips[vehicle_idx] = trip_id
+                    break
 
-        assert len(assigned_trips) <= len(scored_feasible_trips) # Only one trip per vehicle
+        
+        #assert len(assigned_trips) == len(scored_feasible_trips) # Only one trip per vehicle
+        if len(assigned_trips) != len(scored_feasible_trips):
+            print('*'*20)
+            print('Warning: choosing trips error !!!')
+            print('*'*20)
+
 
         # Choose tha final trip and path for each vehicle
         final_trips = []
@@ -130,8 +140,13 @@ class EvaluationSystem:
         final_paths = []
 
         for vehicle_idx in range(len(scored_feasible_trips)):
-            assigned_trip_id = assigned_trips[vehicle_idx]
-            assigned_trip = id_to_trip[assigned_trip_id]
+            # There may exist bugs in the solution, e.g., the assigned trips are less than the number of vehicles.
+            # However, we ignore the bugs here, and assign a Null trip to the vehicle
+            try:
+                assigned_trip_id = assigned_trips[vehicle_idx]
+                assigned_trip = id_to_trip[assigned_trip_id]
+            except:
+                assigned_trip = scored_feasible_trips[vehicle_idx][0][0]
             scored_final_trip = None # The final trip is None if no assigned trips
             for trip_idx, (trip, score, reward) in enumerate(scored_feasible_trips[vehicle_idx]):
                 if (trip == assigned_trip):

@@ -189,7 +189,8 @@ class PlanPath:
             dropoff_idx = pon_list.index(req.dropoff_position)
             # pickup position is front of dropoff position
             if pickup_idx >= dropoff_idx:
-                raise ValueError('pickup position is front of dropoff position')
+                return False, None
+                #raise ValueError('pickup position is front of dropoff position')
             
             # Check pick up time
             pickup_time = np.sum(time_needed_to_next_position[:pickup_idx+1])

@@ -11,6 +11,7 @@ from tqdm import tqdm
 import numpy as np
 import time
 import math
+import pandas as pd
 
 '''
 The subsystem of the control center that handles requests, vehicles and trips
@@ -64,50 +65,56 @@ class RTVSystem:
             itinerary_segment_dis_list: distance between each pair of itinerary nodes
             '''
 
-            requests_raw = pickle.load(open(request_data_dir, 'rb')) # dict
-            for idx in tqdm(requests_raw, desc = 'Initialize requests'):
+            #requests_raw = pickle.load(open(request_data_dir, 'rb')) # dict
+            with open(request_data_dir, 'rb') as f:
+                requests_raw = pd.read_csv(f)
+            for idx in tqdm(range(len(requests_raw)), desc = 'Initialize requests'):   
+                #for request_raw in requests_raw[idx]:
+                # Calculate the corresponding step
+                # Note: the start_time's unit is second. e.g., 100 means 00:01:40 and 3600 means 01:00:00
+                timepoint = requests_raw['start_time'][idx]
+                # The request is not within the target tiem interval
+                # Note: We assume that there are no new requests in the last 30 mins to complete the simulation
+                if timepoint < self.start_timepoint or timepoint > self.end_timepoint:
+                    continue
+                # we filter the trip whose distance is less 1 km
+                if requests_raw['trip_distance'][idx] < 1:
+                    continue
                 
-                for request_raw in requests_raw[idx]:
-                    # Calculate the corresponding step
-                    # Note: the start_time's unit is second. e.g., 100 means 00:01:40 and 3600 means 01:00:00
-                    timepoint = request_raw[8]
-                    # The request is not within the target tiem interval
-                    # Note: We assume that there are no new requests in the last 30 mins to complete the simulation
-                    if timepoint < self.start_timepoint or timepoint > self.end_timepoint - 1800:
-                        continue
-                    # we filter the trip whose distance is less 0.1 km
-                    if request_raw[7] < 0.1:
-                        continue
-                    # Assign each request to a simulation step
-                    step = round((timepoint - self.start_timepoint) / self.step_time)
-                    # pick-up and drop-off position (longitude, latitude)
-                    pickup_position = (request_raw[3], request_raw[2])
-                    dropoff_position = (request_raw[6], request_raw[5])
-                    # pickup_position = self.environment.GetNearestNode((request_raw[3], request_raw[2]))
-                    # dropoff_position = self.environment.GetNearestNode((request_raw[6], request_raw[5]))
-                    if self.consider_itinerary:
-                        travel_time = 0
-                        travel_distance = 0
-                        iti_nodes = request_raw[-5]
-                        for idx in range(len(iti_nodes) - 1):
-                            dis, t = self.environment.GetDistanceandTime(iti_nodes[idx], iti_nodes[idx+1])
-                            travel_distance += dis
-                            travel_time += t
-                    else:
-                        travel_distance, travel_time = self.environment.GetDistanceandTime(pickup_position, dropoff_position, type = 'Manhattan')
-                    request = Request(cfg = self.cfg,
-                                    id = request_raw[0],
-                                    send_request_timepoint = step * self.step_time + self.start_timepoint,
-                                    pickup_position = pickup_position,
-                                    dropoff_position = dropoff_position, # We use (lng, lat) to represent position
-                                    pickup_grid_id = request_raw[9],
-                                    dropoff_grid_id = request_raw[10],
-                                    original_travel_time = travel_time,
-                                    original_travel_distance = travel_distance,
-                                    num_person = 1)
-                    requests_all[step].append(request)
-                    
-                    num_requests += 1
+                # We sample requests according to the given sampling rate
+                if random.random() > self.cfg.REQUEST.SAMPLE_RATE:
+                    continue
+                
+                # Assign each request to a simulation step
+                step = round((timepoint - self.start_timepoint) / self.step_time)
+                # pick-up and drop-off position (longitude, latitude)
+                pickup_position = (round(requests_raw['origin_lng'][idx], 7), round(requests_raw['origin_lat'][idx], 7))
+                dropoff_position = (round(requests_raw['dest_lng'][idx], 7), round(requests_raw['dest_lat'][idx], 7))
+                # pickup_position = self.environment.GetNearestNode((request_raw[3], request_raw[2]))
+                # dropoff_position = self.environment.GetNearestNode((request_raw[6], request_raw[5]))
+                if self.consider_itinerary:
+                    travel_time = 0
+                    travel_distance = 0
+                    iti_nodes = requests_raw['itinerary_node_list'][idx]
+                    for idx in range(len(iti_nodes) - 1):
+                        dis, t = self.environment.GetDistanceandTime(iti_nodes[idx], iti_nodes[idx+1])
+                        travel_distance += dis
+                        travel_time += t
+                else:
+                    travel_distance, travel_time = self.environment.GetDistanceandTime(pickup_position, dropoff_position, type = 'Manhattan')
+                request = Request(cfg = self.cfg,
+                                id = requests_raw['order_id'][idx],
+                                send_request_timepoint = step * self.step_time + self.start_timepoint,
+                                pickup_position = pickup_position,
+                                dropoff_position = dropoff_position, # We use (lng, lat) to represent position
+                                pickup_grid_id = requests_raw['origin_grid_id'][idx],
+                                dropoff_grid_id = requests_raw['dest_grid_id'][idx],
+                                original_travel_time = travel_time,
+                                original_travel_distance = travel_distance,
+                                num_person = 1)
+                requests_all[step].append(request)
+                
+                num_requests += 1
                     
                 
         
@@ -180,7 +187,9 @@ class RTVSystem:
                                'remaining_time_for_current_node', 'itinerary_node_list', 'itinerary_segment_dis_list',
                                'node_id', 'grid_id']
             '''
-            vehicles_raw = pickle.load(open(vehicle_data_dir, 'rb'))
+            # vehicles_raw = pickle.load(open(vehicle_data_dir, 'rb'))
+            with open(vehicle_data_dir, 'rb') as f:
+                vehicles_raw = pd.read_csv(f)
             # Downsample vehicles
             num_vehilces_raw = len(vehicles_raw)
             ds_gap = int(num_vehilces_raw / num_vehicles)
@@ -188,8 +197,8 @@ class RTVSystem:
             for idx in tqdm(range(0, num_vehilces_raw, ds_gap), desc = 'Initialize vehicles'):
                 # Initialize vehicles
                 # We allocate vehicles to nearest intersections
-                # current_position = self.environment.GetNearestNode((vehicles_raw['lng'][idx], vehicles_raw['lat'][idx]))
-                current_position = (vehicles_raw['lng'][idx], vehicles_raw['lat'][idx])
+                #current_position = self.environment.GetNearestNode((vehicles_raw['lng'][idx], vehicles_raw['lat'][idx]))
+                current_position = (round(vehicles_raw['lng'][idx], 7), round(vehicles_raw['lat'][idx], 7))
                 vehicle = Vehicle(cfg=self.cfg,
                                 id = vehicles_raw['driver_id'][idx],
                                 current_position = current_position, # We use coordinate to represent position
@@ -232,7 +241,7 @@ class RTVSystem:
     # params: 1) requests of the current step; 2) vehicles of the current step; 
     #         3) The maximum number of vehicles that a request will be allocated; 4) The maximum distance between a vehicle and the allocated request
     # return: list[list[request]], length = num_vehicles
-    def AllocateRequest2Vehicles(self, requests_step, vehicles_step, max_num_vehicles = 30, max_match_distance = None):
+    def AllocateRequest2Vehicles(self, requests_step, vehicles_step, max_num_vehicles = 10, max_match_distance = None):
         if max_match_distance is None:
             max_match_distance = 999999
         
@@ -241,15 +250,22 @@ class RTVSystem:
 
         for request in requests_step:
             # Calculte the pickup time and distance for all vehicles to pick the request
+            # In order to accelerate calculation, we only assign a request to vehilces nearby
             for vehicle_idx, vehicle in enumerate(vehicles_step):
                 # Check if the vehicle is online and open to requests
                 if not vehicles_step[vehicle_idx].online or not vehicles_step[vehicle_idx].open2request:
                     continue
                 # Check the constraints
-                dis, t = self.environment.GetDistanceandTime(vehicle.current_position, request.pickup_position)
+                dis, t = self.environment.GetDistanceandTime(vehicle.current_position, request.pickup_position, type = 'Manhattan')
+                
                 if dis < max_match_distance and t < request.max_con_pickup_time:
                     requests_for_each_vehicle[vehicle_idx].append(request)
         
+        # We associate at most 5 requests for each vehicle to accelerate the simulation   
+        for idx, reqs in enumerate(requests_for_each_vehicle):
+            if len(reqs) > self.cfg.VEHICLE.MAXCAPACITY + 1:
+                requests_for_each_vehicle[idx] = requests_for_each_vehicle[idx][:self.cfg.VEHICLE.MAXCAPACITY + 1]
+
         return requests_for_each_vehicle
 
 
@@ -271,7 +287,7 @@ class RTVSystem:
             paths.append(Path())
             
             # If the vehicle is empty and still online, but there is no requests nearby, then we consider repositioning the vehicle
-            if len(requests_for_vehicle) == 0 and vehicle.path is None and vehicle.online:
+            if len(requests_for_vehicle) == 0 and vehicle.path is None and vehicle.online and vehicle.open2request:
                 # Considering repositioning in the RL model
                 if self.cfg.MODEL.REPOSITION:
                     # Repositioning idle vehicles to 8 (or less) grids nearby
@@ -292,8 +308,6 @@ class RTVSystem:
                                                 time_needed_to_next_position = np.array([0, time]),
                                                 dis_to_next_position = np.array([0, distance]),
                                                 time_delay_to_each_position = np.zeros((2)))
-                        if self.consider_itinerary:
-                            reposition_path = self.PlanPath.UpdateItineraryNodes(reposition_path)
                         
                         trips.append(reposition_trip)
                         paths.append(reposition_path)

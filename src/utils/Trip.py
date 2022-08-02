@@ -54,6 +54,7 @@ class Path:
                 self.time_needed_to_next_position = self.time_needed_to_next_position[1:]
                 self.dis_to_next_position = self.dis_to_next_position[1:]
                 self.time_delay_to_each_position = self.time_delay_to_each_position[1:]
+        
         # Only consider OD of requests
         else:
             self.next_positions = self.next_positions[1:]

@@ -1,6 +1,6 @@
 #####################################################
 ######         Written by Wang CHEN            ######
-######    E-mail: u3008939@connect.hku.hk      ######
+######     E-mail: wchen22@connect.hku.hk      ######
 ######     Copyright @ Smart Mobility Lab      ######
 ######    Department of Civil Engineering      ######
 ######      Thu University of Hong Kong        ######
@@ -21,6 +21,7 @@ import argparse
 import yaml
 from easydict import EasyDict as edict
 import numpy as np
+import copy
 
 
 
@@ -169,7 +170,8 @@ def main():
     requests_results_all = []
     vehicles_results_all = []
     for day, requests in enumerate(test_data):
-        RunEpisode(requests, vehicles, control_center)
+        vehicles_tmp = copy.deepcopy(vehicles)
+        RunEpisode(requests, vehicles_tmp, control_center)
         
         # Record the results
         requests_results, vehicles_results = control_center.CalculateResults()
@@ -178,6 +180,9 @@ def main():
 
         logger.info('****************** Simulation Day {} *********************'.format(day+1))
         LogResults(logger, requests_results, vehicles_results)
+
+        # Reset control center
+        control_center.UpdateParameters(timepoint=start_timepoint, step=0)
     
     # Average results
     requests_results_all = np.array(requests_results_all).mean(axis = 0)

@@ -91,9 +91,9 @@ class States():
     def Vehicles2States(self, vehicles):
         max_capacity = self.cfg.VEHICLE.MAXCAPACITY
         
-        veh_grid_list = np.zeros((len(vehicles), 2*max_capacity+1), dtype = int)
+        veh_grid_list = np.zeros((len(vehicles), 2*max_capacity+1), dtype = np.int64)
         veh_t_delay = np.zeros((len(vehicles), 2*max_capacity+1), dtype = float)
-        cur_loc = np.ones((len(vehicles), 1), dtype = int)
+        cur_loc = np.ones((len(vehicles), 1), dtype = np.int64)
 
         for idx, vehicle in enumerate(vehicles):
             # current position
@@ -129,7 +129,7 @@ class States():
         states.extend(states_veh)
 
         cur_t = math.floor(step * self.step_time / self.cfg.MODEL.TIME_INTERVAL)
-        cur_t = np.ones((len(vehicles), 1), dtype = int) * cur_t
+        cur_t = np.ones((len(vehicles), 1), dtype = np.int64) * cur_t
         veh_dis = self.vehicles_distribution.GetDistribution()
         veh_dis = np.repeat(veh_dis.reshape(1, veh_dis.shape[0], veh_dis.shape[1]), len(vehicles), axis = 0)
         req_dis = self.requests_distribution.GetDistribution()

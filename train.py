@@ -1,6 +1,6 @@
 #####################################################
 ######         Written by Wang CHEN            ######
-######    E-mail: u3008939@connect.hku.hk      ######
+######     E-mail: wchen22@connect.hku.hk      ######
 ######     Copyright @ Smart Mobility Lab      ######
 ######    Department of Civil Engineering      ######
 ######      Thu University of Hong Kong        ######
@@ -147,15 +147,15 @@ def main():
         train_data.append(train_data_one_day)
         logger.info('The number of training requests (day {}): {} '.format(day+1, num))
     
-    # # Load requests for validation
-    # val_data = []
-    # val_data_path = cfg.REQUEST.DATA.VALIDATION # all file names in the 'val_data_path' filefold
-    # val_data_names = os.listdir(val_data_path)
-    # for day, val_data_name in enumerate(val_data_names):
-    #     val_data_dir = os.path.join(val_data_path, val_data_name)
-    #     val_data_one_day, num = control_center.RTV_system.InitializeRequests(val_data_dir)
-    #     val_data.append(val_data_one_day)
-    #     logger.info('The number of validation requests: {} of day {}'.format(num, day+1))
+    # Load requests for validation
+    val_data = []
+    val_data_path = cfg.REQUEST.DATA.VALIDATION # all file names in the 'val_data_path' filefold
+    val_data_names = os.listdir(val_data_path)
+    for day, val_data_name in enumerate(val_data_names):
+        val_data_dir = os.path.join(val_data_path, val_data_name)
+        val_data_one_day, num = control_center.RTV_system.InitializeRequests(val_data_dir)
+        val_data.append(val_data_one_day)
+        logger.info('The number of validation requests: {} of day {}'.format(num, day+1))
     
     # Load vehicles
     vehicles = control_center.RTV_system.InitializeVehicles(cfg.VEHICLE.DATA, num_vehicles = cfg.VEHICLE.NUM)
@@ -201,16 +201,22 @@ def main():
             requests_results, vehicles_results = control_center.CalculateResults()
             logger.info('*********** Episode {},  Training day {} ************'.format(episode+1, day+1))
             LogResults(logger, requests_results, vehicles_results)
+
+            # Reset control center
+            control_center.UpdateParameters(timepoint=start_timepoint, step=0)
         
-        # # validate
-        # for day, requests in enumerate(val_data):
-        #     vehicles_tmp = copy.deepcopy(vehicles)
-        #     requests_tmp = copy.deepcopy(requests)
-        #     RunEpisode(requests_tmp, vehicles_tmp, control_center, agent, train=False)
-        #     # Record the results
-        #     requests_results, vehicles_results = control_center.CalculateResults()
-        #     logger.info('*********** Episode {},  Validation day {} ************'.format(episode+1, day+1))
-        #     LogResults(logger, requests_results, vehicles_results)
+        # validate
+        for day, requests in enumerate(val_data):
+            vehicles_tmp = copy.deepcopy(vehicles)
+            requests_tmp = copy.deepcopy(requests)
+            RunEpisode(requests_tmp, vehicles_tmp, control_center, agent, train=False)
+            # Record the results
+            requests_results, vehicles_results = control_center.CalculateResults()
+            logger.info('*********** Episode {},  Validation day {} ************'.format(episode+1, day+1))
+            LogResults(logger, requests_results, vehicles_results)
+
+            # Reset control center
+            control_center.UpdateParameters(timepoint=start_timepoint, step=0)
         
 
         # Save the best model

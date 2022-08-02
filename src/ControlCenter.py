@@ -30,7 +30,7 @@ class ControlCenter:
         self.start_timepoint = start_timepoint
         self.end_timepoint = end_timepoint
         self.step_time = step_time
-        self.total_steps = int((end_timepoint - start_timepoint) / step_time - 1)
+        self.total_steps = int((end_timepoint + self.cfg.SIMULATION.TIME2FINISH - start_timepoint) / step_time - 1)
         
 
         self.RTV_system = RTVSystem(environment = self.environment,
@@ -47,6 +47,7 @@ class ControlCenter:
 
         # Initialize requests and vehicles, see class RTVSystem for detailed information
         self.requests_all = None
+        self.requests_step = None
         self.vehicles_all = None
 
         self.action_system = ActionSystem(cfg = self.cfg,
@@ -67,6 +68,7 @@ class ControlCenter:
     def Initialize(self, requests, vehicles):
         self.requests_all = requests
         self.vehicles_all = vehicles
+        self.requests_step = requests[self.step]
         self.action_system.vehicles = vehicles
         self.action_system.requests = requests[self.step]
         self.post_process_system.requests = requests[self.step]
@@ -83,19 +85,20 @@ class ControlCenter:
     # Update requests at next time step
     # params: Unmatched_requests: requests that haven't been allocated to any vehicles and don't cancel
     def UpdateRequests(self, unmatched_requests):
-        if self.step >= self.total_steps-1:
+        if self.step >= self.total_steps-1 or self.step >= len(self.requests_all) - 1:
             new_requests = []
         else:
             new_requests = self.requests_all[self.step + 1] # New requests at next time step
         requests = list(set(unmatched_requests) | set(new_requests)) # Union
         self.action_system.requests = requests
         self.post_process_system.requests = requests
+        self.requests_step = requests
 
 
     '''RTV System'''
     # Allocate requests to each vehicle, see class RTVSystem for detailed information    
     def AllocateRequest2Vehicles(self, max_num_vehicles = 30, max_match_distance = 3000):
-        requests_for_each_vehicle = self.RTV_system.AllocateRequest2Vehicles(self.requests_all[self.step], self.vehicles_all, max_num_vehicles, max_match_distance)
+        requests_for_each_vehicle = self.RTV_system.AllocateRequest2Vehicles(self.requests_step, self.vehicles_all, max_num_vehicles, max_match_distance)
         return requests_for_each_vehicle
     
     # Generate feasible trips and the corresponding paths, see class RTVSystem for detailed information
@@ -194,13 +197,13 @@ class ControlCenter:
             for request in requests:
                 requests_results[0] += 1
                 # The request has been served
-                if request.finish_dropoff:
+                if request.finish_pickup:
                     requests_results[1] += 1
                     requests_results[2] += request.assign_timepoint - request.send_request_timepoint
                     requests_results[3] += request.pickup_timepoint - request.assign_timepoint
-                    requests_results[4] += request.dropoff_timepoint - request.pickup_timepoint - request.original_travel_time
-                    requests_results[5] += request.distance_on_vehicle - request.original_travel_distance
-                    # requests_results[4] += request.time_on_vehicle - request.original_travel_time
+                    #requests_results[4] += request.dropoff_timepoint - request.pickup_timepoint - request.original_travel_time
+                    requests_results[5] += max(0, request.distance_on_vehicle - request.original_travel_distance)
+                    requests_results[4] += max(0, request.time_on_vehicle - request.original_travel_time)
                     # requests_results[5] += request.distance_on_vehicle - request.original_travel_distance
                 # The request has been cancelled
                 # Note: Here, we assume that there is no passenger at any vehicles. In other words, all trips are finished at the end of simulation

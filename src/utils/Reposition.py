@@ -36,8 +36,8 @@ class Reposition:
             node = self.environment.nodes_coordinate[int(random.random()*len(self.environment.nodes_coordinate))] # Coordinate
             if node != vehicle.current_position: # Repositioning to another position
                 break
-        dis = self.environment.GetTravelDistance(node, vehicle.current_position, self.consider_itinerary)
-        time = self.environment.GetTravelTime(dis = dis)
+        dis, time = self.environment.GetDistanceandTime(node, vehicle.current_position, type = 'Manhattan')
+        
         # Initialize path
         path = Path(current_position=vehicle.current_position,
                     next_positions=[vehicle.current_position, node],

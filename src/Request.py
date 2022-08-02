@@ -80,7 +80,7 @@ class Request:
         
         total_price =  initial_charge + self.original_travel_distance / (1609 / 5) * mileage_charge + night_surcharge + peak_hour_price
         
-        return total_price
+        return 0.7*total_price
     
     
     

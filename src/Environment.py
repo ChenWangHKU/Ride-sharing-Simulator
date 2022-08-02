@@ -40,6 +40,7 @@ class EnvironmentNYModel:
         # Initialize road network
         self.road_network, self.node_coord_to_id, self.node_id_to_coord, self.nodes_coordinate, self.nodes_connection = self.InitializeEnvironment()
         self.node_coord_to_grid, self.nodes_coordinate_grid = self.SplitGrids()
+        self.node_lnglat_to_xy = self.LngLat2xy()
 
         
 
@@ -104,12 +105,38 @@ class EnvironmentNYModel:
         
         return node_coord_to_grid, nodes_coordinate_grid
 
+    
+    # function: Convert coordinate system from longtitude & latitude to x & y
+    # params: None
+    # return: dict of converting (lng, lat) to (x,y)
+    # Note: It's computing expensive to calculate distance usiing longtitude and latitude, so that we convert nodes' coordinate to xy
+    def LngLat2xy(self):
+        node_lnglat_to_xy = {}
+        x0, y0 = np.mean(np.array(self.nodes_coordinate), axis = 0)
+
+        # Convert angle system to radian system
+        ori_lng, ori_lat = x0 * math.pi / 180., y0 * math.pi / 180.
+        Earth_R = 6371393 # unit: meter
+        
+        for (lng, lat) in self.nodes_coordinate:
+            des_lng, des_lat = lng * math.pi / 180., lat * math.pi / 180.
+            # Distance
+            dis_EW = Earth_R * math.acos(min(1, math.cos(ori_lat)**2 * math.cos(ori_lng - des_lng) + math.sin(ori_lat)**2))
+            dis_NS = Earth_R * abs(ori_lat - des_lat)
+            x = dis_EW * np.sign(des_lng - ori_lng)
+            y = dis_NS * np.sign(des_lat - ori_lat)
+
+            node_lnglat_to_xy[(lng, lat)] = (x, y)
+            
+        return node_lnglat_to_xy
+
 
     # function: get 8 (or less 8) repositioning locations nearby according to the vehicle's location
     # params: the vehicle's location
     # return: repositioning coordinates, grid coordinates, repositioning distance and time
     def GetRepositionLocation(self, vehicle_location):
         reposition = []
+        #vehicle_location[0] = round(vehicle_location[0], 7)
         vx, vy = self.node_coord_to_grid[vehicle_location]
         v_grid = vy * self.x_grid_num + vx + 1 # current(vehicle) grid id
         grids = [(vy-1, vx), (vy-1, vx+1), (vy, vx+1), (vy+1, vx+1), (vy+1, vx), (vy+1, vx-1), (vy, vx-1), (vy-1, vx-1)]
@@ -151,30 +178,29 @@ class EnvironmentNYModel:
         we allow users to choose whether considering itinerary nodes or not when calculating distance.
     '''
     def GetDistanceandTime(self, origin, destination, type = 'Linear', congestion_factor = 1.0):
-         # if the input origin and destination are node id, then we convert them to coordinate
+        # if the input origin and destination are node id, then we convert them to coordinate
         if not isinstance(origin, tuple):
             origin = self.node_id_to_coord[origin]
         if not isinstance(destination, tuple):
             destination = self.node_id_to_coord[destination]
-        # Convert angle system to radian system
-        ori_lng, ori_lat = np.array(origin) * math.pi / 180.
-        des_lng, des_lat = np.array(destination) * math.pi / 180.
-        Earth_R = 6371393 # unit: meter
+        
+        # if len(str(origin[0]).split('.')[1]) > 7 or len(str(origin[1]).split('.')[1]) > 7:
+        #     origin = (round(origin[0], 7), round(origin[1], 7))
+        # if len(str(destination[0]).split('.')[1]) > 7 or len(str(destination[1]).split('.')[1]) > 7:
+        #     destination = (round(destination[0], 7), round(destination[1], 7))
+        
+        x1, y1 = self.node_lnglat_to_xy[origin]
+        x2, y2 = self.node_lnglat_to_xy[destination]
         
         # convert lat and lng to distance
         if type == 'Linear': # linear distance
-            a, b = ori_lat - des_lat, ori_lng - des_lng
-            dis = 2* Earth_R * math.asin(math.sqrt(math.sin(a/2) * math.sin(a/2) 
-                                            + math.cos(ori_lat) * math.cos(des_lat) * math.sin(b/2) * math.sin(b/2)))
-        
+            dis = math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
         elif type == 'Manhattan': # Manhattan distance
-            dis_EW = Earth_R * math.acos(min(1, math.cos(ori_lat)**2 * math.cos(ori_lng - des_lng) + math.sin(ori_lat)**2))
-            dis_NS = Earth_R * abs(ori_lat - des_lat)
-            dis = math.sqrt(dis_EW**2 + dis_NS**2)
+            dis = abs(x1 - x2) + abs(y1 - y2)
         else:
             raise NotImplementedError
         # Here congestion_factoe = 1 means we don't consider congestion
-        time = dis / self.vehicle_velocity * congestion_factor
+        time = dis / self.vehicle_velocity
 
         return dis, time
 
